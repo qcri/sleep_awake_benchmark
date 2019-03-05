@@ -680,7 +680,7 @@ def apply_formulas_to_psgfile(filename):
     df["baselinesleep"] = 1
     df["baselineawake"] = 0
 
-    df["timebased"] = time_based(df,  min_sleep=15, min_awaken=30)
+    df["time_based"] = time_based(df,  min_sleep=15, min_awaken=30)
 
     # This is the GT block:
     gtTrue = df[df["gt"] == True]
@@ -698,7 +698,9 @@ def apply_formulas_to_psgfile(filename):
     df["p_sazonov2"],df["sazonov2"] = sazonov2(df)
     df["p_sadeh"],df["sadeh"] = sadeh(df)
     df["p_cole"],df["cole"] = cole(df)
-    df["p_oakley"],df["oakley"] = oakley(df, 10)
+    df["p_oakley10"],df["oakley10"] = oakley(df, 10)
+    df["p_oakley40"],df["oakley40"] = oakley(df, 40)
+    df["p_oakley80"],df["oakley80"] = oakley(df, 80)
     df["p_kripke"],df["kripke"] = kripke(df)
     df["p_webster"],df["webster"] = webster(df)
 

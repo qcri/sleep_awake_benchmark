@@ -9,7 +9,7 @@ from sleep_misc import rescore_models
 #from scipy.stats import ttest_ind
 
 baselines = ["gt", "always1", "always0", "binterval", "wake", "sleep"]
-defaultalgs = ["sazonov", "sazonov2", "cole", "time_based", "sadeh", "oakley", "kripke", "webster"]
+defaultalgs = ["sazonov", "sazonov2", "cole", "time_based", "sadeh", "kripke", "webster", "oakley10", "oakley40", "oakley80" ]
 defaultml = ["ExtraTrees", "SGD_perceptron", "SGD_log", "SGD_hinge", "SGD_huber"]
 defaultnn = ["LSTM_20_raw", "LSTM_50_raw", "LSTM_100_raw", "CNN_20_raw", "CNN_50_raw", "CNN_100_raw"]
 algs = defaultalgs + defaultml + defaultnn

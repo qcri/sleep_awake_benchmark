@@ -37,8 +37,8 @@ for filename in glob(PATH_TO_FILES):
     # Run the formula based physical models (no randomization required) on 20% test samples
     dfs.append(apply_formulas_to_psgfile(filename))
 
-formula_algs = ["time_based","sazonov", "sazonov2", "sadeh","cole","oakley", "kripke", "webster"]
-p_formula_algs = ["p_sazonov","p_sazonov2","p_sadeh","p_cole","p_oakley","p_kripke","p_webster"]
+formula_algs = ["time_based", "sazonov", "sazonov2", "sadeh", "cole", "kripke", "webster", "oakley10", "oakley40", "oakley80"]
+p_formula_algs = ["p_sazonov", "p_sazonov2", "p_sadeh", "p_cole", "p_kripke", "p_webster", "p_oakley10", "p_oakley40", "p_oakley80"]
 
 dfs = pd.concat(dfs)
 dfs["gt_sleep_block"] = dfs["gt_sleep_block"].astype(int)
