@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import sys
 import pickle
 
@@ -15,10 +16,20 @@ DATASET_PATH = "hdf_task%d" % (TASK)
 OUTPUT = "task%d_ml.csv" % (TASK)
 SUMMARY_OUTPUT = "task%d_summary_ml.csv" % (TASK)
 SAVED_MODELS_OUTPUT = "model_ml_task%d.pkl" % (TASK)
+USING_MESA_VARIABLES = True
 
 print("...Loading Task %d dataset into memory..." % (TASK))
 dftrain, dftest, featnames = load_dataset(DATASET_PATH, useCache=True)
 print("...Done...")
+
+
+if USING_MESA_VARIABLES:
+    mesa_cols = ["gender1", "sleepage5c", "insmnia5", "rstlesslgs5", "slpapnea5"]
+    variables = pd.read_csv("./data/mesa-sleep-dataset-0.3.0.csv.gz")[["mesaid"] + mesa_cols]
+
+    dftrain = pd.merge(dftrain, variables)
+    dftest = pd.merge(dftest, variables)
+    featnames = featnames + mesa_cols
 
 # Optmized models for Task 1:
 models = [
@@ -29,7 +40,6 @@ models = [
      ("SGD_perceptron",SGDClassifier(loss='perceptron', alpha=0.01, class_weight="balanced", fit_intercept=False, penalty='elasticnet', warm_start=True, l1_ratio=0.15, max_iter=1000, tol=0.001, shuffle=True, verbose=0, epsilon=0.1, n_jobs=1, random_state=42, learning_rate='optimal', eta0=0.0, power_t=0.5,   average=False, n_iter=None)),
      ("ExtraTrees", ExtraTreesClassifier(bootstrap=False, class_weight=None, criterion='entropy', max_depth=20, max_features='auto', max_leaf_nodes=None, min_impurity_decrease=0.0, min_impurity_split=None, min_samples_leaf=1, min_samples_split=2, min_weight_fraction_leaf=0.0, n_estimators=512, n_jobs=8, oob_score=False, random_state=None, verbose=0, warm_start=False)) # Acc:0.8277, F1:0.8633
 ]
-
 
 def run_test(model, Xtrain, Xtest, Ytrain, Ytest, model_name):
     model.fit(Xtrain,Ytrain)
