@@ -6,7 +6,7 @@ from sklearn import metrics
 EVAL_METRICS = ["SEInterval", "SEOnlyREST", "SEMarkers", "SEWholeDF", "SEGTBlock", "SESelfBlock", "SESelfBlock5Min",
                 "TotalSleep", "TotalSleepBlock", "PercentSleep", "PercentSleepBlock", "DeltaStartBlock", "DeltaEndBlock",
                 "Accuracy", "AccuracyBlock", "Precision", "PrecisionBlock", "Recall", "RecallBlock",
-                "F1", "F1Block", "~F1", "~F1Block", "Specificity","SpecificityBlock"]
+                "F1", "F1Block", "~F1", "~F1Block", "Specificity","SpecificityBlock", "WokeCounts"]
 TIME_METRICS = ["DeltaStartBlock", "DeltaEndBlock"]
 
 def evaluation_summary(df, scoring_algorithms, precomputed_dict=None):
@@ -91,10 +91,18 @@ def evaluate_scoring_algorithm(df, alg):
             r.append(v)
         r.append(df.groupby("mesaid")[[alg + "_block","gt_sleep_block"]].apply(lambda x: func(x["gt_sleep_block"], x[alg + "_block"])))
 
+    r.append(df.groupby("mesaid")[[alg]].apply(lambda x: woke_count(alg)))
+
     res = pd.concat(r, axis=1)
     res.columns = EVAL_METRICS
 
     return res
+
+def woke_count(s):
+    tmp = s.copy()
+    tmpPlus1 = tmp.shift(1)
+    ans = ((tmp == 0) & (tmpPlus1 == 1)).sum().values[0]
+    return ans
 
 def minutes_scored(df):
     return df.shape[0]
@@ -152,7 +160,7 @@ def sleep_efficiency(s, start, end):
     """
     #print "Start: %d, End: %d" % (start,end)
     if end-start > 0:
-        return 1. * s.loc[start:end].sum() / (end-start)
+        return 1. * s.loc[start:end].sum() / s.loc[start:end].shape[0]
     else:
         return np.nan
 
