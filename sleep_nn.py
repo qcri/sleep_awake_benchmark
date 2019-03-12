@@ -19,7 +19,7 @@ from sklearn.model_selection import train_test_split
 TASK = int(sys.argv[1])
 SEQ_LEN = int(sys.argv[2]) # used in the experiments 20, 50 and 100
 NN_TYPE = sys.argv[3] # LSTM or CNN
-TRAINING = True
+TRAINING = False
 np.random.seed(42)
 
 # Parameters used in the experiments
