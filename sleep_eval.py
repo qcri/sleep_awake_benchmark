@@ -4,9 +4,9 @@ from sleep_misc import make_sleep_block, get_marker_positions
 from sklearn import metrics
 
 EVAL_METRICS = ["SEInterval", "SEOnlyREST", "SEMarkers", "SEWholeDF", "SEGTBlock", "SESelfBlock", "SESelfBlock5Min",
-                "TotalSleep", "TotalSleepBlock", "PercentSleep", "PercentSleepBlock", "DeltaStartBlock", "DeltaEndBlock",
+                "TotalSleepInCol", "TotalSleepInColBlock", "PercentSleep", "PercentSleepBlock", "DeltaStartBlock", "DeltaEndBlock",
                 "Accuracy", "AccuracyBlock", "Precision", "PrecisionBlock", "Recall", "RecallBlock",
-                "F1", "F1Block", "~F1", "~F1Block", "Specificity","SpecificityBlock", "WokeCounts"]
+                "F1", "F1Block", "~F1", "~F1Block", "Specificity","SpecificityBlock", "WokeCounts", "WASO", "TotalSleepTime"]
 TIME_METRICS = ["DeltaStartBlock", "DeltaEndBlock"]
 
 def evaluation_summary(df, scoring_algorithms, precomputed_dict=None):
@@ -71,8 +71,8 @@ def evaluate_scoring_algorithm(df, alg):
     r.append(df.groupby("mesaid")[["actValue", alg+"_block"]].apply(lambda x: 0.0 if x[x[alg + "_block"]>0].empty else sleep_efficiency_wo_act_more_X_min(x["actValue"], x[x[alg + "_block"] > 0].index[0], x[x[alg + "_block"] > 0].index[-1], X_epo=10)))
 
     # TotalSleep and TotalSleepBlock
-    r.append(df.groupby("mesaid")[[alg]].apply(lambda x: total_sleep_time(x, alg)))
-    r.append(df.groupby("mesaid")[[alg+"_block"]].apply(lambda x: total_sleep_time(x, alg + "_block")))
+    r.append(df.groupby("mesaid")[[alg]].apply(lambda x: total_sleep_in_col(x, alg)))
+    r.append(df.groupby("mesaid")[[alg+"_block"]].apply(lambda x: total_sleep_in_col(x, alg + "_block")))
 
     # PercentSleep and PercentSleepBlock
     r.append(df.groupby("mesaid")[[alg]].apply(lambda x: percent_sleep(x, alg)))
@@ -91,28 +91,23 @@ def evaluate_scoring_algorithm(df, alg):
             r.append(v)
         r.append(df.groupby("mesaid")[[alg + "_block","gt_sleep_block"]].apply(lambda x: func(x["gt_sleep_block"], x[alg + "_block"])))
 
-    r.append(df.groupby("mesaid")[[alg]].apply(lambda x: woke_count(x[alg])))
+    r.append(df.groupby("mesaid")[[alg, "gt_sleep_block"]].apply(lambda x: 0.0 if x["gt_sleep_block"].empty else woke_count(x[alg], x["gt_sleep_block"])))
+    r.append(df.groupby("mesaid")[[alg, "gt_sleep_block"]].apply(lambda x: 0.0 if x["gt_sleep_block"].empty else WASO(x[alg], x["gt_sleep_block"])))
+    r.append(df.groupby("mesaid")[[alg, "gt_sleep_block"]].apply(lambda x: 0.0 if x["gt_sleep_block"].empty else TST(x[alg], x["gt_sleep_block"])))
 
     res = pd.concat(r, axis=1)
     res.columns = EVAL_METRICS
 
     return res
 
-def woke_count(s):
-    tmp = s.copy()
-    tmpPlus1 = tmp.shift(1)
-    ans = ((tmp == 0) & (tmpPlus1 == 1)).sum()
-    return ans
-
 def minutes_scored(df):
     return df.shape[0]
 
-def total_sleep_time(df, col):
+def total_sleep_in_col(df, col):
     return df[col].sum()
 
 def percent_sleep(df, col):
     return 1. * df[col].sum() / df.shape[0]
-
 
 """
     Definition of various evaluation metrics
@@ -153,7 +148,6 @@ def eval_f1_awake(gt, pred):
     else:
         return metrics.f1_score(gt == False, pred == False, average='binary')
 
-
 def sleep_efficiency(s, start, end):
     """
     Start and end are the location index (locations are given by .index[]).
@@ -164,6 +158,22 @@ def sleep_efficiency(s, start, end):
     else:
         return np.nan
 
+def WASO(s, gtblock):
+    sleep_block = s[gtblock == 1]
+    awake_epochs = (sleep_block == 0).sum()
+    return awake_epochs
+
+def TST(s, gtblock):
+    sleep_block = s[gtblock == 1]
+    slept_epochs = (sleep_block == 1).sum()
+    return slept_epochs
+
+def woke_count(s, gtblock):
+    sleep_block = s[gtblock == 1]
+    tmp = sleep_block.copy()
+    tmpPlus1 = tmp.shift(1)
+    ans = ((tmp == 0) & (tmpPlus1 == 1)).sum()
+    return ans
 
 def sleep_efficiency_first_last_REST(s, interval):
     resting = interval[interval != "ACTIVE"]
