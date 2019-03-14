@@ -91,7 +91,7 @@ def evaluate_scoring_algorithm(df, alg):
             r.append(v)
         r.append(df.groupby("mesaid")[[alg + "_block","gt_sleep_block"]].apply(lambda x: func(x["gt_sleep_block"], x[alg + "_block"])))
 
-    r.append(df.groupby("mesaid")[[alg]].apply(lambda x: woke_count(alg)))
+    r.append(df.groupby("mesaid")[[alg]].apply(lambda x: woke_count(x[alg])))
 
     res = pd.concat(r, axis=1)
     res.columns = EVAL_METRICS
@@ -101,7 +101,7 @@ def evaluate_scoring_algorithm(df, alg):
 def woke_count(s):
     tmp = s.copy()
     tmpPlus1 = tmp.shift(1)
-    ans = ((tmp == 0) & (tmpPlus1 == 1)).sum().values[0]
+    ans = ((tmp == 0) & (tmpPlus1 == 1)).sum()
     return ans
 
 def minutes_scored(df):
