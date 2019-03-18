@@ -25,7 +25,7 @@ TASK = int(sys.argv[1])
 SEQ_LEN = int(sys.argv[2]) # used in the experiments 20, 50 and 100
 NN_TYPE = sys.argv[3] # LSTM or CNN
 TRAINING = True
-USING_MESA_VARIABLES = True
+USING_MESA_VARIABLES = False
 
 np.random.seed(42)
 tf.set_random_seed(42)
@@ -67,8 +67,12 @@ dftrain["activity"] = scaler.transform(dftrain[["activity"]].fillna(0.0))
 dftest["activity"] = scaler.transform(dftest[["activity"]].fillna(0.0))
 
 def extract_x_y(df, seq_len, mesaid):
-    variables = df[df["mesaid"] == mesaid][mesa_cols].copy()
-    variables = variables.fillna(0.0).values
+    if USING_MESA_VARIABLES:
+        variables = df[df["mesaid"] == mesaid][mesa_cols].copy()
+        variables = variables.fillna(0.0).values
+    else:
+        variables = None
+
     df = df[df["mesaid"] == mesaid][["activity","gt"]].copy()
 
     for s in range(1,seq_len/2 + 1):
@@ -91,11 +95,12 @@ def get_data(df, seq_len):
         x_tmp, y_tmp, variables_tmp = extract_x_y(df, seq_len, mid)
         x_ = np.concatenate((x_, x_tmp))
         y_ = np.concatenate((y_, y_tmp))
-        variables_ = np.concatenate((variables_, variables_tmp))
+        if variables_ is not None:
+            variables_ = np.concatenate((variables_, variables_tmp))
 
     return x_, y_, variables_
 
-def build_model(input_dim, input2_dim, nn_type):
+def build_model(input_dim, input2_dim=0, nn_type="CNN"):
     if nn_type == "CNN":
         return build_model_CNN(input_dim, input2_dim)
     elif nn_type == "LSTM":
@@ -103,7 +108,7 @@ def build_model(input_dim, input2_dim, nn_type):
     else:
         print("Invalid nn_type '%s'. Options are 'CNN' or 'LSTM'" % (nn_type))
 
-def build_model_LSTM(input_dim):
+def build_model_LSTM(input_dim, input2_dim = 0):
     RNN = layers.LSTM
     start = time.time()
 
@@ -118,37 +123,39 @@ def build_model_LSTM(input_dim):
     model.summary()
     return model
 
-def build_model_CNN(input1, input2):
+def build_model_CNN(input1, input2 = 0):
     start = time.time()
 
-    #model = Sequential()
-    #model.add(Conv1D(filters=64, kernel_size=2, input_shape=input_dim))
-    #model.add(Activation('relu'))
-    #model.add(Flatten())
-    #model.add(Dense(64, activation='relu'))
-    #model.add(Dense(1, activation='sigmoid'))
-    #('Accuracy:', '0.7715216379711494')
-    #('F1:', '0.8041874376869391')
+    if input2 == 0:
 
-    #('Accuracy:', '0.7626803164262448')
-    #('F1:', '0.7999607766228672')
+        model = Sequential()
+        model.add(Conv1D(filters=64, kernel_size=2, input_shape=input1))
+        model.add(Activation('relu'))
+        model.add(Flatten())
+        model.add(Dense(64, activation='relu'))
+        model.add(Dense(1, activation='sigmoid'))
+        #Accuracy:
+        #F1:
 
-    inputs = Input(shape=input1)
-    x = Conv1D(64, 2, activation='relu')(inputs)
-    x = Flatten()(x)
+    else:
+        inputs = Input(shape=input1)
+        x = Conv1D(64, 2, activation='relu')(inputs)
+        x = Flatten()(x)
 
-    variables = Input(shape=input2, name="mesa_variables")
-    y = Flatten()(variables)
-    x = concatenate([x, y])
+        variables = Input(shape=input2, name="mesa_variables")
+        y = Flatten()(variables)
+        x = concatenate([x, y])
 
-    x = Dense(64, activation='relu')(x)
-    predictions = Dense(1, activation='sigmoid')(x)
+        x = Dense(64, activation='relu')(x)
+        predictions = Dense(1, activation='sigmoid')(x)
 
-    model = Model(inputs=[inputs,variables], outputs=predictions)
+        model = Model(inputs=[inputs,variables], outputs=predictions)
+        #Accuracy: 0.811463
+        #F1: 0.840017
+
     model.compile(optimizer='rmsprop', loss='binary_crossentropy', metrics=['accuracy'])
     print("> Compilation Time : ", time.time() - start)
-
-    #model.summary()
+    model.summary()
     return model
 
 # Process input:
@@ -159,10 +166,13 @@ if input_type == "raw":
 
     x_train = np.reshape(x_train, x_train.shape + (1,))
     x_test = np.reshape(x_test, x_test.shape + (1,))
-    variables_train = np.reshape(variables_train, variables_train.shape + (1,))
-    variables_test = np.reshape(variables_test, variables_test.shape + (1,))
 
-    x_train, x_val, y_train, y_val, variables_train, variables_val = train_test_split(x_train, y_train, variables_train, test_size=0.20, random_state=43, shuffle=False)
+    if USING_MESA_VARIABLES:
+        variables_train = np.reshape(variables_train, variables_train.shape + (1,))
+        variables_test = np.reshape(variables_test, variables_test.shape + (1,))
+        x_train, x_val, y_train, y_val, variables_train, variables_val = train_test_split(x_train, y_train, variables_train, test_size=0.20, random_state=43, shuffle=False)
+    else:
+        x_train, x_val, y_train, y_val = train_test_split(x_train, y_train, test_size=0.20, random_state=43, shuffle=False)
 
 elif input_type == "feat":
     print("Generating dataset from feature set")
@@ -186,14 +196,16 @@ def run_experiment(input_type, epochs, batch_size, x_train, x_val, x_test, y_tra
     print("Training Shape: " ,x_train.shape[1:])
 
     if input_type == "raw":
-        model = build_model(x_train.shape[1:], variables_train.shape[1:], NN_TYPE)
-        model.fit([x_train, variables_train], y_train, epochs=epochs, batch_size=batch_size, verbose=1, validation_data=([x_val, variables_val], y_val))
-        print("Accuracy:", eval_acc(np.round(model.predict([x_test, variables_test])), y_test))
-        print("F1:", eval_f1(np.round(model.predict([x_test, variables_test])), y_test))
-
-        #model.fit(x_train, y_train, epochs=epochs, batch_size=batch_size, verbose=1, validation_data=(x_val, y_val))
-        #print("Accuracy:", eval_acc(np.round(model.predict(x_test)), y_test))
-        #print("F1:", eval_f1(np.round(model.predict(x_test)), y_test))
+        if USING_MESA_VARIABLES:
+            model = build_model(x_train.shape[1:], variables_train.shape[1:], NN_TYPE)
+            model.fit([x_train, variables_train], y_train, epochs=epochs, batch_size=batch_size, verbose=1, validation_data=([x_val, variables_val], y_val))
+            print("Accuracy:", eval_acc(np.round(model.predict([x_test, variables_test])), y_test))
+            print("F1:", eval_f1(np.round(model.predict([x_test, variables_test])), y_test))
+        else:
+            model = build_model(x_train.shape[1:], 0, NN_TYPE)
+            model.fit(x_train, y_train, epochs=epochs, batch_size=batch_size, verbose=1, validation_data=(x_val, y_val))
+            print("Accuracy:", eval_acc(np.round(model.predict(x_test)), y_test))
+            print("F1:", eval_f1(np.round(model.predict(x_test)), y_test))
 
     elif input_type == "feat":
         model = build_model(x_train.shape[1:], NN_TYPE)
