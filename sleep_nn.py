@@ -11,7 +11,6 @@ from sklearn.preprocessing import StandardScaler
 #
 from keras.layers import Flatten, Conv1D, concatenate, Input
 from keras.layers.core import Activation
-from keras.layers.core import Dropout
 from keras.models import Model
 from keras.models import Sequential
 from keras.models import load_model
@@ -34,7 +33,7 @@ random.seed(42)
 
 # Parameters used in the experiments
 input_type = "raw"
-epochs = 10
+epochs = 3
 batch_size = 32
 
 from keras import backend as K
@@ -104,19 +103,29 @@ def build_model(input_dim, input2_dim=0, nn_type="CNN"):
     if nn_type == "CNN":
         return build_model_CNN(input_dim, input2_dim)
     elif nn_type == "LSTM":
-        return build_model_LSTM(input_dim)
+        return build_model_LSTM(input_dim, input2_dim)
     else:
         print("Invalid nn_type '%s'. Options are 'CNN' or 'LSTM'" % (nn_type))
 
-def build_model_LSTM(input_dim, input2_dim = 0):
-    RNN = layers.LSTM
+def build_model_LSTM(input1, input2 = 0):
     start = time.time()
 
-    model = Sequential()
-    model.add(RNN(32, input_shape=input_dim))
-    #model.add(Dropout(0.2))
+    if input2 == 0:
+        model = Sequential()
+        model.add(layers.LSTM(32, input_shape=input1))
+        model.add(Dense(1, activation='sigmoid'))
+    else:
+        in1 = Input(shape=input1)
+        x1 = layers.LSTM(32)(in1)
 
-    model.add(Dense(1, activation='sigmoid'))
+        in2 = Input(shape=input2, name="mesa_variables")
+        x2 = Flatten()(in2)
+
+        x = concatenate([x1, x2])
+        predictions = Dense(1, activation="sigmoid")(x)
+
+        model = Model(inputs=[in1, in2], outputs=predictions)
+
     model.compile(optimizer='rmsprop', loss='binary_crossentropy', metrics=['accuracy'])
     print("> Compilation Time : ", time.time() - start)
 
@@ -228,7 +237,10 @@ else:
     model = load_model("models/" + MODEL_OUTFILE)
     print("Model loaded from disk!")
 
-predictions = model.predict([x_test, variables_test])
+if USING_MESA_VARIABLES:
+    predictions = model.predict([x_test, variables_test])
+else:
+    predictions = model.predict(x_test)
 
 dftest["p_%s_%d" % (NN_TYPE, SEQ_LEN)] = predictions
 dftest["%s_%d" % (NN_TYPE, SEQ_LEN)] = np.round(predictions)
