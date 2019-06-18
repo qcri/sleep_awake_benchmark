@@ -1,6 +1,20 @@
 ## Sleep Awake Benchmark
 
-This code is part of the paper _''A Large Scale Benchmark to Validate Sleep-Wake Scoring Algorithms''_ currently under review.
+This code is part of the paper _''A Large Scale Benchmark to Validate Sleep-Wake Scoring Algorithms''_.
+See the full publication at: https://nature.com/articles/s41746-019-0126-9
+
+```
+@article{palotti2019benchmark,
+  title={Benchmark on a large cohort for sleep-wake classification with machine learning techniques},
+  author={Palotti, Joao and Mall, Raghvendra and Aupetit, Michael and Rueschman, Michael and Singh, Meghna and Sathyanarayana, Aarti and Taheri, Shahrad and Fernandez-Luque, Luis},
+  journal={npj Digital Medicine},
+  volume={2},
+  number={1},
+  pages={50},
+  year={2019},
+  publisher={Nature Publishing Group}
+}
+```
 
 ### How To Use it
 
