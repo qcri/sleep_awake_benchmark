@@ -3,8 +3,24 @@ import numpy as np
 from glob import glob
 import os
 from itertools import product
+import pdb
 
-def load_dataset(path, useCache=False, saveCache=False, cacheName="hdf", ground_truth="stage"):
+def _process_file(filename, ground_truth):
+    dftmp = load_mesa_PSG(filename, ground_truth)
+
+    # creates a gt_block
+    gtTrue = dftmp[dftmp["gt"] == True]
+    if gtTrue.empty:
+        print("Ignoring file %s" % (filename))
+        return None, None
+    start_block = dftmp.index.get_loc(gtTrue.index[0])
+    end_block =  dftmp.index.get_loc(gtTrue.index[-1])
+    dftmp["gt_sleep_block"] = make_one_block(dftmp["gt"], start_block, end_block)
+
+    featnames = get_features(dftmp)
+    return dftmp, featnames
+
+def load_dataset(path, useCache=False, saveCache=False, cacheName="hdf", ground_truth="stage", batch_size=100):
 
     # Load cached dataset
     if useCache:
@@ -17,25 +33,39 @@ def load_dataset(path, useCache=False, saveCache=False, cacheName="hdf", ground_
 
     # Or....load the dataset from scratch
     tmp = []
+    allfiles = glob(os.path.join(path, "*"))
+    nfiles = len(allfiles)
+    concat_counter = 0
 
-    for filename in glob(os.path.join(path, "*"))[:]:
-        print(filename)
-        dftmp = load_mesa_PSG(filename, ground_truth)
+    print("Processing...", end='', flush=True)
+    for file_counter, filename in enumerate(allfiles):
 
-        # creates a gt_block
-        gtTrue = dftmp[dftmp["gt"] == True]
-        if gtTrue.empty:
-            print("Ignoring file %s" % (filename))
+        if file_counter % batch_size == batch_size-1:
+            print("%.2f%%..." % (file_counter/nfiles), end='', flush=True)
+
+        dftmp, featnames = _process_file(filename, ground_truth)
+        if dftmp is None:
             continue
-        start_block = dftmp.index.get_loc(gtTrue.index[0])
-        end_block =  dftmp.index.get_loc(gtTrue.index[-1])
-        dftmp["gt_sleep_block"] = make_one_block(dftmp["gt"], start_block, end_block)
 
-        featnames = get_features(dftmp)
         tmp.append(dftmp)
 
+        if file_counter % batch_size == batch_size-1:
+            dfconcat = pd.concat(tmp, ignore_index=True, axis=0)
+            dfconcat.drop(["whitelight", "redlight", "greenlight", "bluelight"], axis=1, inplace=True)
+
+            dfconcat.to_pickle("__tmp_%d.pickle" % (concat_counter))
+            concat_counter += 1
+            tmp = []
+
     wholedf = pd.concat(tmp)
+    for i in range(concat_counter):
+        tmp = pd.read_pickle("__tmp_%d.pickle" % (i))
+        wholedf = wholedf.append(tmp, ignore_index=True)
+        os.remove("__tmp_%d.pickle" % (i))
+
+    print("Dataset processed...")
     del tmp
+
     wholedf.reset_index(inplace=True, drop=True)
 
     # Generates a binary version of the interval col
@@ -58,6 +88,8 @@ def load_dataset(path, useCache=False, saveCache=False, cacheName="hdf", ground_
     test_idx = wholedf[wholedf["mesaid"].apply(lambda x: x in uids_test)].index
     dftest = wholedf.iloc[test_idx].copy()
 
+    del wholedf
+
     if saveCache:
         store = pd.HDFStore(cacheName)
         store["train"] = dftrain
@@ -77,6 +109,10 @@ def rescore_models(df, models, tl_min_sleep=10, tl_min_awake=20):
     all_models = []
     for model in models:
         print("Creating new cols for alg %s..." % (model))
+        if model not in df:
+            print("Model %s not found in dataframe...Skipping it." % (model))
+            continue
+
         df[model] = df[model].astype(np.bool)
         all_models.append(model)
 
@@ -770,7 +806,7 @@ def sleeping_in_next_X_epochs_from_idx(gt, idx, X=30):
     return sum(gt.loc[idx:idx+X] > 0) < 5
 
 def get_marker_positions(m, gt):
-    mid = m.shape[0]/2
+    mid = m.shape[0]//2
 
     #print("Possible first half:\n", m[0:mid][m[0:mid] > 0])
     candidates =  m[0:mid][m[0:mid] > 0]

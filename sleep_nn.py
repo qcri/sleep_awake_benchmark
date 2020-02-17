@@ -18,6 +18,7 @@ from keras import layers
 from keras.layers import Dense
 
 from sklearn.model_selection import train_test_split
+from sklearn.externals import joblib
 import tensorflow as tf
 
 TASK = int(sys.argv[1])
@@ -27,19 +28,19 @@ TRAINING = True
 USING_MESA_VARIABLES = False
 
 np.random.seed(42)
-tf.set_random_seed(42)
+#tf.set_random_seed(42)
 os.environ['PYTHONHASHSEED']=str(42)
 random.seed(42)
 
 # Parameters used in the experiments
 input_type = "raw"
-epochs = 3
+epochs = 30
 batch_size = 32
 
-from keras import backend as K
-session_conf = tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1)
-sess = tf.Session(graph=tf.get_default_graph(), config=session_conf)
-K.set_session(sess)
+#from keras import backend as K
+#session_conf = tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1)
+#sess = tf.Session(graph=tf.get_default_graph(), config=session_conf)
+#K.set_session(sess)
 
 MODEL_OUTFILE = "model_%s_task%d_%s_seq%d.pkl" % (NN_TYPE, TASK, input_type, SEQ_LEN)
 RESULTS_OUTFILE = "task%d_%s_%s_%d.csv" % (TASK, NN_TYPE, input_type, SEQ_LEN)
@@ -50,7 +51,6 @@ print("...Loading dataset into memory...")
 dftrain, dftest, featnames = load_dataset(DATASET_PATH, useCache=True)
 print("...Done...")
 
-
 if USING_MESA_VARIABLES:
     mesa_cols = ["gender1", "sleepage5c", "insmnia5", "rstlesslgs5", "slpapnea5"]
     variables = pd.read_csv("./data/mesa-sleep-dataset-0.3.0.csv.gz")[["mesaid"] + mesa_cols].fillna(0.0)
@@ -58,12 +58,13 @@ if USING_MESA_VARIABLES:
     dftrain = pd.merge(dftrain, variables)
     dftest = pd.merge(dftest, variables)
 
-
 scaler = StandardScaler()
 scaler.fit(dftrain[["activity"]].fillna(0.0))
 
 dftrain["activity"] = scaler.transform(dftrain[["activity"]].fillna(0.0))
 dftest["activity"] = scaler.transform(dftest[["activity"]].fillna(0.0))
+scaler_filename = "scaler_activity_%s_task%d_seq%d.save" % (NN_TYPE, TASK, SEQ_LEN)
+joblib.dump(scaler, scaler_filename)
 
 def extract_x_y(df, seq_len, mesaid):
     if USING_MESA_VARIABLES:
@@ -74,10 +75,10 @@ def extract_x_y(df, seq_len, mesaid):
 
     df = df[df["mesaid"] == mesaid][["activity","gt"]].copy()
 
-    for s in range(1,seq_len/2 + 1):
+    for s in range(1, seq_len//2 + 1):
 	    df["shift_%d" % (s)] = df["activity"].shift(s)
 
-    for s in range(1,seq_len/2 + 1):
+    for s in range(1, seq_len//2 + 1):
 	    df["shift_-%d" % (s)] = df["activity"].shift(-s)
 
     y = df["gt"]
