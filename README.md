@@ -1,7 +1,7 @@
 ## Sleep Awake Benchmark
 
 This code is part of the paper _''A Large Scale Benchmark to Validate Sleep-Wake Scoring Algorithms''_.
-See the full publication at: https://nature.com/articles/s41746-019-0126-9
+See the full publication at: https://www.nature.com/articles/s41746-019-0126-9
 
 ```
 @article{palotti2019benchmark,
